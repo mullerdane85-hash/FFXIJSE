@@ -128,7 +128,7 @@ local C_JOB_TAG_HOVER  = { 255, 255, 230, 160 }
 -- Tier mapping ARMOR-TYPE → upgrade chain available
 local TIER_ORDER  = { 'NQ', '+1', '+2', '+3', '+4' }
 local TABS        = { 'ARTIFACT', 'RELIC', 'EMPYREAN', 'CAPE' }
-local TAB_LABELS  = { ARTIFACT = 'AF', RELIC = 'Relic', EMPYREAN = 'Empy', CAPE = 'Cape' }
+local TAB_LABELS  = { ARTIFACT = 'AF', RELIC = 'Relic', EMPYREAN = 'Empy', CAPE = 'Capes' }
 
 -- Ambuscade cape per job (data from capetrader, by Lygre & Burntwaffle@Odin,
 -- BSD-licensed). Cape augments are done via the Gorpa-Masorpa NPC in Mhaura
