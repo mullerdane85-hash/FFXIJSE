@@ -1,56 +1,102 @@
-## Note
+# FFXIJSE
 
-This addon was not created by me, all credit goes to Nalfey for their hard work, I am simply providing a place for people to download it from. This has been done with Nalfey's permission.
+Job Specific Equipment tracker with a GSUI-style window.
 
-# JSE
-JSE (Job Specific Equipment) is an addon for FFXI that tracks the AF, Relic, and Empyrean gear you have and the next available upgrades. 
-It looks for the NQ, +1, +2, +3, +4 versions that you have for a specific job and tells you which upgrade materials you already have / need to augment the JSE to the next stage.
+A fork of [Nalfey's JSE](https://github.com/Daleterrence/JSE) — same core
+data modules (`inventory.lua`, `currency.lua`, `job_equipment.lua`,
+`jobs/`), new main file with a draggable UI instead of chat-only output.
+
+## Install
+
+```
+cd path\to\Windower4\addons
+git clone https://github.com/mullerdane85-hash/FFXIJSE.git
+```
+
+In-game:
+
+```
+//lua load FFXIJSE
+```
+
+To autoload every session, add `lua load FFXIJSE` to
+`scripts\init.txt`.
+
+## Window
+
+Press **J** to toggle the window (chat-aware — the key passes through
+to chat when typing). Or run `//fj` (or `//ffxijse`).
+
+Layout (matches GSUI's visual style — blue border, dark title bar,
+tab buttons inside the title bar):
+
+```
+┌─ 3px blue border ────────────────────────────────────────────┐
+│ FFXIJSE       [AF][Relic][Empy]                      [WAR]   │
+├──────────────────────────────────────────────────────────────┤
+│  Pummeler's Mask              ✗ NEED  +2 → +3                │
+│     P. WAR Card           0/12    ✗                          │
+│     Kin's Scale           4/1     ✓                          │
+│     Khoma Cloth           0/1     ✗                          │
+│  Pummeler's Lorica            ✓ MAXED (+4)                   │
+│  Pummeler's Mufflers          ✓ MAXED (+4)                   │
+│  ...                                                          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Per-piece status indicator:
+- `✓ MAXED (+4)` — piece is at maximum tier
+- `✓ READY +2 → +3` — you have ALL materials to do the next upgrade
+- `✗ NEED +2 → +3` — you own the piece but lack some materials
+- `? owns NONE → +1` — you don't own the piece at all
+
+Below each non-maxed piece, the required materials list:
+- `✓` = you have enough
+- `✗` = you need more
 
 ## Commands
 
-**`//jse [ af | relic | empy ] <JOB>`**
-- Check equipment and available upgrades for a specific job, displays upgrade materials you already have or need to upgrade that job's equipment.
+| Command | What |
+|---|---|
+| `//fj` (or `//ffxijse`) | Toggle the window (same as J key) |
+| `//fj show` / `//fj hide` | Explicit show/hide |
+| `//fj af` / `//fj relic` / `//fj empy` | Switch tab |
+| `//fj job <JOB>` | Override displayed job (e.g. `//fj job war`) |
+| `//fj job auto` | Clear override; track current main job |
+| `//fj refresh` | Re-scan inventory + currency |
+| `//fj help` | Command list |
 
-**`//jsetrack [ af | relic | empy ] <JOB>`** 
-- Same as the basic //jse command but also displays in an extra, draggable window.
+By default the window auto-detects your current main job and updates
+on job change / zone change. The `J` key toggles visibility.
 
-**`//jsetrack [ hide | show ] `**
-- Hides/shows the //jsetrack window.  
+## Data behavior
 
-**`//jseall af <JOB>`** 
-- Specifically for AF Cards, this will check for gear on the currently logged-in character and also checks for cards on all charcters/mules that have an existing data file. (The addon must have been loaded once on that character for data to be available)
+Same as the original JSE:
+- Reads inventory across **all storage slips** (Storage NPCs, Mog
+  Wardrobes, etc.) via the Slips library
+- Tracks Rem's Tale Chapters, Apollyon Units, Temenos Units, and
+  Gallimaufry via currency packets
+- Per-character data file written under `data/` (gitignored)
+- Cross-character mule check is NOT yet ported from JSE's `//jseall`
+  command — TODO
 
-**`//jsecurrency`**
-- Displays tracked currencies for upgrades and their values (Rem's Chapters, Gallimauffry, Apollyon and Temenos units)
+## Credits
 
-**`//jsehelp`**
-- Displays the available commands
+- **Nalfey of Asura** — original JSE addon (data modules, scanning,
+  job equipment database). All credit for the actual upgrade-data
+  research and packet handling goes to Nalfey.
+- **Daleterrence** — hosts JSE at github.com/Daleterrence/JSE with
+  Nalfey's permission. FFXIJSE is derived from that mirror.
+- **mullerdane85-hash** — GSUI-style window UI rewrite.
 
-## Examples ##
+BSD 3-clause license inherited from JSE — see `LICENSE`.
 
-**/jse af WHM** - Displays needed materials to upgrade WHM Artifact armor
-![jse_af_WHM](https://why-are-you-looking-at-an-image-url.dtrm.uk/img/nalfey-addons/JSE/jse1.png)
+## TODO / future extensions
 
-**//jsetrack af WHM** - Displays results in a draggable window
-![jsetrack_af_WHM](https://why-are-you-looking-at-an-image-url.dtrm.uk/img/nalfey-addons/JSE/jse2.png)
-
-**//jseall af PUP** - Checks for P. Cards on all your mules 
-![jseall_af_PUP](https://why-are-you-looking-at-an-image-url.dtrm.uk/img/nalfey-addons/JSE/jse3.png)
-
-**//jsecurrency** - Displays relevent currencies
-![jsecurrency](https://why-are-you-looking-at-an-image-url.dtrm.uk/img/nalfey-addons/JSE/jse4.png)
-
-### v1.11
-* Syntax fix for some item name contractions.
-* Extra tracking window code split into a separate file.
-
-### v1.10
-* Added a new command //jsetrack that displays the results in a dragable window. 
-* Merged the //jse and //jsemats into a single command.
-* Typo fix for SCH gear names and Maliya. Coral Orb.
-
-### v1.01
-* Minor display updates and syntax fix for DRG gear.
-
-### v1.00
-* First release.
+- `//ffxijse all` cross-character / mule check (port from JSE's
+  `//jseall`)
+- Auto-refresh when the player approaches a known ??? NPC for
+  upgrade turn-ins (Voliathon's request — proximity-based refresh)
+- Job picker dropdown in the title bar (currently job override is
+  command-only)
+- Per-tier filter (e.g. show only pieces stuck at +2)
