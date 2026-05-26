@@ -73,7 +73,7 @@ local SCROLL_BTN_H = 20
 local PAD          = 8
 local FOOTER_H     = 38                  -- bottom button strip
 local BTN_H        = 26
-local PANEL_W      = 580                 -- wider to fit icon + name + materials
+local PANEL_W      = 620                 -- wider to fit 4 tabs + job tag without overlap
 local PANEL_BODY_H = 460                 -- FIXED body height; content scrolls inside
 
 -- Job picker dropdown (3 cols × 8 rows = 24 cells; 23 entries: Auto + 22 jobs)
@@ -954,8 +954,12 @@ local function build_window()
     -- Leave 80px on the right for the job tag.
     local tab_area_x = tb_x + 100
     local job_tag_w  = 80
+    -- Tab width: divide the available middle space evenly across #TABS.
+    -- Was hardcoded to /3 originally; broke when the Capes tab brought it
+    -- to 4 tabs (the 4th tab + dropdown arrow stomped each other).
+    local tab_count  = #TABS
     local tab_avail  = tb_w - 100 - job_tag_w
-    local tab_w = math.floor((tab_avail - TAB_GAP * 2) / 3)
+    local tab_w = math.floor((tab_avail - TAB_GAP * (tab_count - 1)) / tab_count)
     local tab_y = tb_y + math.floor((TITLE_BAR_H - TAB_H) / 2)
 
     for i, key in ipairs(TABS) do
