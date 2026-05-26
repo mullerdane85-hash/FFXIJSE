@@ -173,17 +173,20 @@ end
 -- For a piece definition (data row from job_equipment), find the highest tier
 -- the player owns. Returns the tier string ('NQ', '+1', ..., '+4') or nil.
 -- The piece definition format from JSE:
---   { {long_name, short_name}, slot_id, { ["+1"]=mats, ["+2"]=mats, ... } }
+--   { {long_name [, short_name]}, slot_id, { ["+1"]=mats, ["+2"]=mats, ... } }
+-- short_name is OPTIONAL — many entries (e.g. {"Brioso Roundlet"}) only have
+-- a long name. Default short_name to long_name to keep the probe loop safe.
 local function highest_owned_tier(piece)
-    local names = piece[1]
+    local names = piece[1] or {}
     local long_name  = names[1]
-    local short_name = names[2]
+    local short_name = names[2] or long_name
+    if not long_name then return nil end   -- malformed data row — bail
     local storage    = inventory.get_local_storage() or {}
 
     -- Check each tier in reverse order — the highest owned wins
     for i = #TIER_ORDER, 1, -1 do
         local tier = TIER_ORDER[i]
-        local probe_name = (tier == 'NQ') and long_name or (long_name .. ' ' .. tier)
+        local probe_name  = (tier == 'NQ') and long_name  or (long_name  .. ' ' .. tier)
         local probe_short = (tier == 'NQ') and short_name or (short_name .. ' ' .. tier)
         for storage_name, items in pairs(storage) do
             if storage_name ~= 'gil' and storage_name ~= 'key items' then
@@ -245,25 +248,31 @@ local function compute_piece_states()
     local out = {}
     for _, piece in ipairs(data) do
         local owned = highest_owned_tier(piece)
-        local nxt   = next_tier(owned)
-        local mats  = (nxt and piece[3]) and piece[3][nxt] or nil
-        local ready = mats and can_upgrade(mats)
-        table.insert(out, {
-            piece = piece,
-            name  = piece[1][1],
-            owned = owned,
-            next_tier = nxt,
-            mats  = mats,
-            ready = ready,
-        })
+        -- List mode: only show pieces the player owns (any tier including NQ)
+        if owned then
+            local nxt   = next_tier(owned)
+            local mats  = (nxt and piece[3]) and piece[3][nxt] or nil
+            local ready = mats and can_upgrade(mats)
+            table.insert(out, {
+                piece = piece,
+                name  = (piece[1] or {})[1] or '?',
+                owned = owned,
+                next_tier = nxt,
+                mats  = mats,
+                ready = ready,
+            })
+        end
     end
     return out
 end
 
--- Each piece takes 1 header row + (#mats if not maxed) sub-rows
+-- Each owned piece takes 1 row when maxed, else 1 row + #mats sub-rows.
+-- (The left column is always 1 row — name + current tier. The right column
+-- expands vertically into the material list.)
 local function piece_block_height(p)
-    local mat_count = (p.mats and #p.mats) or 0
-    return PIECE_H + (mat_count * ROW_H) + 4   -- 4px gap
+    if not p.mats then return PIECE_H end
+    local mat_count = #p.mats
+    return math.max(PIECE_H, PIECE_H + (mat_count * ROW_H) - ROW_H + 4)
 end
 
 -- =============================================================================
@@ -347,60 +356,86 @@ local function build_window()
     ui.rect.body = { x = tb_x, y = body_y, w = tb_w, h = body_h }
 
     if #pieces == 0 then
-        ui.el.empty = make_text(
-            'No ' .. settings.tab:lower() .. ' data for ' .. job .. '.',
-            tb_x + PAD, body_y + PAD, C_SUMMARY, 11)
+        -- Distinguish "no data" (no upgrade table for this job/armor)
+        -- from "you don't own any pieces of this set yet".
+        local has_data = job_equipment[job] and job_equipment[job][settings.tab]
+        local msg
+        if not has_data or #has_data == 0 then
+            msg = 'No ' .. settings.tab:lower() .. ' data for ' .. job .. '.'
+        else
+            msg = 'No ' .. settings.tab:lower() .. ' pieces owned on ' .. job
+                  .. ' yet.\n(' .. #has_data .. ' pieces exist for this set —\n'
+                  .. ' acquire one to see it here.)'
+        end
+        ui.el.empty = make_text(msg, tb_x + PAD, body_y + PAD, C_SUMMARY, 11)
         for _, e in pairs(ui.el) do show(e) end
         return
     end
 
-    -- Render pieces — apply ui.scroll offset
-    local row_x = tb_x + PAD
-    local cur_y = body_y + PAD - ui.scroll
+    -- List mode — owned pieces only. Two columns:
+    --   LEFT  (name + current tier + status icon)  ~240px
+    --   RIGHT (materials for next upgrade, or "✓ MAXED" if at +4)
+    --
+    -- Scroll offsets the entire content; pieces outside the visible body
+    -- band are skipped on render to save work.
+    local left_x  = tb_x + PAD
+    local right_x = tb_x + PAD + 240
+    local cur_y   = body_y + PAD - ui.scroll
+    local body_top = body_y
+    local body_bot = body_y + body_h - PAD
 
     for _, p in ipairs(pieces) do
-        local block_h = piece_block_height(p)
+        local block_h   = piece_block_height(p)
         local block_top = cur_y
         local block_bot = cur_y + block_h
 
-        -- Skip pieces entirely above the visible area
-        if block_bot > body_y and block_top < body_y + body_h - PAD then
-            -- Header row
-            local status_text, status_color
+        if block_bot > body_top and block_top < body_bot then
+            -- ===== LEFT column: "<piece name> (current tier)  <icon>" =====
+            local left_icon, left_color
             if not p.next_tier then
-                status_text  = '✓ MAXED (+4)'
-                status_color = C_PIECE_MAX
-            elseif not p.owned then
-                status_text  = string.format('? owns NONE  →  +1')
-                status_color = C_PIECE_NEED
+                left_icon  = '✓'           -- maxed
+                left_color = C_PIECE_MAX
             elseif p.ready then
-                status_text  = string.format('✓ READY  %s → %s', p.owned, p.next_tier)
-                status_color = C_PIECE_READY
+                left_icon  = '✓'           -- ready to upgrade
+                left_color = C_PIECE_READY
             else
-                status_text  = string.format('✗ NEED  %s → %s', p.owned, p.next_tier)
-                status_color = C_PIECE_NEED
+                left_icon  = '✗'           -- need more
+                left_color = C_PIECE_NEED
             end
 
-            local header = make_text(
-                string.format('%-26s  %s', p.name, status_text),
-                row_x, cur_y, status_color, 11, false)
+            local owned_label = (p.owned == 'NQ') and '' or (' ' .. p.owned)
+            local left_str = string.format('%s %s%s', left_icon, p.name, owned_label)
+            local left_text = make_text(left_str, left_x, cur_y, left_color, 11, false)
+
+            -- ===== RIGHT column: materials list or MAXED =====
             local mat_texts = {}
-            if p.mats then
+            if not p.next_tier then
+                -- Maxed — single-line "MAXED" on the right
+                local mt = make_text('MAXED (+4)', right_x, cur_y, C_PIECE_MAX, 11, true)
+                table.insert(mat_texts, mt)
+            elseif p.mats and #p.mats > 0 then
+                -- Stack each material on its own line
                 for i, mat in ipairs(p.mats) do
-                    local have = count_material(mat.name)
-                    local ok = have >= mat.count
+                    local have  = count_material(mat.name)
+                    local ok    = have >= mat.count
                     local color = ok and C_MAT_HAVE or C_MAT_NEED
                     local check = ok and '✓' or '✗'
-                    local line = string.format('   %-24s %d/%d  %s', mat.name, have, mat.count, check)
-                    local mt = make_text(line, row_x, cur_y + PIECE_H + (i - 1) * ROW_H, color, 10)
+                    local line  = string.format('%s %s  %d/%d', check, mat.name, have, mat.count)
+                    local mt = make_text(line, right_x, cur_y + (i - 1) * ROW_H, color, 10)
                     table.insert(mat_texts, mt)
                 end
+            else
+                -- Unknown tier (e.g. NQ owned but no +1 chain in data)
+                local mt = make_text('—', right_x, cur_y, C_SUMMARY, 11, false)
+                table.insert(mat_texts, mt)
             end
-            table.insert(ui.rows, { header = header, mats = mat_texts })
+
+            table.insert(ui.rows, { header = left_text, mats = mat_texts })
         end
 
         cur_y = cur_y + block_h
     end
+
 
     for _, e in pairs(ui.el) do show(e) end
     for _, r in ipairs(ui.rows) do
