@@ -615,15 +615,20 @@ local function gather_for_piece(piece_state)
         return
     end
 
-    -- Execute moves (Windower's put_item moves the slot into main inventory).
+    -- Execute moves. windower.ffxi.put_item(bag_id, slot, count) takes a
+    -- COUNT parameter and will split-stack when count < stack size — so if
+    -- you need 12 SMN Cards and the stack has 99, this moves exactly 12,
+    -- leaving 87 in the source bag.
+    --
     -- If the piece is currently equipped, unequip first and delay the moves
     -- ~0.7s so the server processes the unequip before the put_item.
     notify(('Gathering %d stack(s) for %s...'):format(#moves, piece_state.name), 158)
     local function do_moves()
         for _, mv in ipairs(moves) do
             windower.ffxi.put_item(mv.bag_id, mv.slot, mv.count)
-            local tag = mv.is_piece and '  (piece) +' or '  + '
-            notify(('%s%s x%d'):format(tag, mv.name, mv.count), 160)
+            local from = BAG_SHORT[mv.bag_id] or BAG_NAMES[mv.bag_id] or '?'
+            local tag = mv.is_piece and '  (piece) +' or '  +'
+            notify(('%s %s x%d  (from %s)'):format(tag, mv.name, mv.count, from), 160)
         end
     end
     if unequip_first then
